@@ -13,7 +13,6 @@ import {
 } from "recharts";
 import { apiUrl } from "./api";
 
-console.log("VITE_API_BASE =", import.meta.env.VITE_API_BASE);
 
 // 貯金の種別
 const AMOUNTS = [
