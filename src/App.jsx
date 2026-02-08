@@ -11,6 +11,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { apiUrl } from "./api";
 
 // 貯金の種別
 const AMOUNTS = [
