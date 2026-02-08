@@ -112,7 +112,7 @@ export default function App() {
   async function fetchMeta() {
 
     try {
-      const res = await fetch("/api/meta");
+      const res = await fetch(apiUrl("/api/meta"));
       if (!res.ok) return;
       const data = await res.json();
       if (data?.minDate) setMinDate(data.minDate);
@@ -135,7 +135,7 @@ export default function App() {
       granularity: "auto",
     });
 
-    const res = await fetch(`/api/summary?${qs.toString()}`);
+    const res = await fetch(apiUrl(`/api/summary?${qs.toString()}`));
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
@@ -161,7 +161,7 @@ export default function App() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/transactions", {
+      const res = await fetch(apiUrl("/api/transactions"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount }),
@@ -190,7 +190,7 @@ export default function App() {
         throw new Error("初期値は0以上の整数にしてください");
       }
 
-      const res = await fetch("/api/initial-balance", {
+      const res = await fetch(apiUrl("/api/initial-balance"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount }),
