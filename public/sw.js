@@ -30,16 +30,16 @@ self.addEventListener("activate", (event) => {
 
 // fetch
 self.addEventListener("fetch", (event) => {
-  const { request } = event;
+  const url = new URL(event.request.url);
 
-  // APIは常にネット優先
-  if (request.url.includes("/api/")) {
+  // APIは Service Worker で触らない
+  if (url.origin === self.location.origin && url.pathname.startsWith("/api/")) {
     return;
   }
 
   event.respondWith(
-    caches.match(request).then((cached) => {
-      return cached || fetch(request);
+    caches.match(event.request).then((cached) => {
+      return cached || fetch(event.request);
     })
   );
 });
