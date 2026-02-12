@@ -319,7 +319,9 @@ export default function App() {
             ログイン
           </button>
           <br></br>
-          <p  className="muted">デモアカウント：id:admin@example.com  password:password123</p>
+          <p className="muted">デモアカウント:</p>
+          <p className="muted">id:admin@example.com</p>
+          <p className="muted">password:password123</p>
         </div>
       </div>
     );
