@@ -11,8 +11,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { apiUrl } from "./api";
 
+import { apiUrl, apiFetch, setToken as saveToken, clearToken } from "./api";
 
 // 貯金の種別
 const AMOUNTS = [
@@ -41,32 +41,17 @@ if ("serviceWorker" in navigator) {
 
 // X軸のラベルを作成
 function formatXAxisLabel(dateStr, granularity) {
-  // dateStr は 'YYYY-MM-DD'
   if (!dateStr) return "";
-
-  if (granularity === "month") {
-    // 'YYYY-MM'
-    return dateStr.slice(0, 7);
-  }
-  if (granularity === "week") {
-    // 'MM/DD'（週開始日表示）
-    return dateStr.slice(5).replace("-", "/");
-  }
-  // day: 'MM/DD'
+  if (granularity === "month") return dateStr.slice(0, 7);
+  if (granularity === "week") return dateStr.slice(5).replace("-", "/");
   return dateStr.slice(5).replace("-", "/");
 }
 
 // ツールチップのラベル文言作成
 function formatTooltipLabel(dateStr, granularity) {
   if (!dateStr) return "";
-  if (granularity === "month") {
-    // 例: 2026-02
-    return `${dateStr.slice(0, 7)}（月）`;
-  }
-  if (granularity === "week") {
-    // 例: 2026-02-03（週）
-    return `${dateStr}（週開始）`;
-  }
+  if (granularity === "month") return `${dateStr.slice(0, 7)}（月）`;
+  if (granularity === "week") return `${dateStr}（週開始）`;
   return dateStr;
 }
 
@@ -91,10 +76,12 @@ function rangeFromDays(days) {
   return { from: yyyymmdd(from), to: yyyymmdd(to) };
 }
 
-// アプリ本体
 export default function App() {
-
   // state
+  const [token, setTokenState] = useState(() => localStorage.getItem("token") || "");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
   const [total, setTotal] = useState(0);
   const [byDay, setByDay] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -103,19 +90,56 @@ export default function App() {
   const [rangeKey, setRangeKey] = useState("7d");
   const [range, setRange] = useState(() => rangeFromDays(7));
   const [granularity, setGranularity] = useState("day"); // day|week|month
+
   const [initAmount, setInitAmount] = useState("");
   const [showInitModal, setShowInitModal] = useState(false);
-  const [initDone, setInitDone] = useState(false); // 初期値設定済みフラグ
-  
-  // 全期間用：最古日付をAPIからもらう（なければ今日）
+  const [initDone, setInitDone] = useState(false);
+
   const [minDate, setMinDate] = useState(null);
 
-  // meta apiを呼ぶ (1件データがあるかを確認)
-  async function fetchMeta() {
+  // 401共通処理（tokenが切れてたらログインに戻す）
+  function handleUnauthorized() {
+    clearToken();
+    setTokenState("");
+  }
+
+  // ログイン
+  async function login() {
+    setLoading(true);
+    setError("");
 
     try {
-      const res = await fetch(apiUrl("/meta"));
+      const res = await fetch(apiUrl("/login"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`login failed: ${res.status} ${text}`);
+      }
+
+      const data = await res.json();
+      const t = data?.token;
+      if (!t) throw new Error("token not found");
+
+      saveToken(t);          // localStorageへ保存
+      setTokenState(t);      // stateへ反映
+    } catch (e) {
+      setError(e?.message || "login error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // meta
+  async function fetchMeta() {
+    try {
+      const res = await apiFetch("/meta");
+      if (res.status === 401) return handleUnauthorized();
       if (!res.ok) return;
+
       const data = await res.json();
       if (data?.minDate) setMinDate(data.minDate);
     } catch {
@@ -123,12 +147,10 @@ export default function App() {
     }
   }
 
-  // summary apiを呼ぶ(データの取得)
+  // summary
   async function fetchSummary(nextRange = range) {
-
     setError("");
 
-    // GETパラメータをまとめる
     const qs = new URLSearchParams({
       from: nextRange.from,
       to: nextRange.to,
@@ -137,14 +159,14 @@ export default function App() {
       granularity: "auto",
     });
 
-    const res = await fetch(apiUrl(`/summary?${qs.toString()}`));
+    const res = await apiFetch(`/summary?${qs.toString()}`);
+    if (res.status === 401) return handleUnauthorized();
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       throw new Error(`summary failed: ${res.status} ${text}`);
     }
 
-    // 引いてきたデータをstateにセット
     const data = await res.json();
     setTotal(data.total ?? 0);
     setGranularity(data.granularity ?? "day");
@@ -156,33 +178,35 @@ export default function App() {
     setByDay(rows);
   }
 
-  // transaction api呼び出し（金額をDBに登録）
-
+  // transaction
   async function postTransaction(amount) {
-
     setLoading(true);
     setError("");
+
     try {
-      const res = await fetch(apiUrl("/transactions"), {
+      const res = await apiFetch("/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount }),
       });
+
+      if (res.status === 401) return handleUnauthorized();
+
       if (!res.ok) {
         const text = await res.text().catch(() => "");
         throw new Error(`post failed: ${res.status} ${text}`);
       }
-      await fetchSummary();   // summaryを再取得
+
+      await fetchSummary();
     } catch (e) {
-      setError(e.message || "error");
+      setError(e?.message || "error");
     } finally {
       setLoading(false);
     }
   }
 
-  // 初期金額APIを呼ぶ
+  // initial balance
   async function postInitialBalance() {
-
     setLoading(true);
     setError("");
 
@@ -192,11 +216,13 @@ export default function App() {
         throw new Error("初期値は0以上の整数にしてください");
       }
 
-      const res = await fetch(apiUrl("/initial-balance"), {
+      const res = await apiFetch("/initial-balance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount }),
       });
+
+      if (res.status === 401) return handleUnauthorized();
 
       if (!res.ok) {
         const text = await res.text().catch(() => "");
@@ -206,7 +232,7 @@ export default function App() {
       setInitAmount("");
       await fetchSummary(range);
     } catch (e) {
-      setError(e.message || "error");
+      setError(e?.message || "error");
     } finally {
       setLoading(false);
     }
@@ -214,59 +240,93 @@ export default function App() {
 
   // 期間の変更
   async function changeRange(nextKey) {
+    setRangeKey(nextKey);
+    setLoading(true);
 
-  setRangeKey(nextKey);
-  setLoading(true);
+    try {
+      const to = yyyymmdd(new Date());
+      let nextRange;
 
-  try {
-    const to = yyyymmdd(new Date());
-    let nextRange;
+      if (nextKey === "all") {
+        nextRange = { from: minDate ?? to, to };
+      } else {
+        const def = RANGES.find((r) => r.key === nextKey);
+        nextRange = rangeFromDays(def.days);
+      }
 
-    if (nextKey === "all") {
-      nextRange = { from: minDate ?? to, to };
-    } else {
-      const def = RANGES.find(r => r.key === nextKey);
-      nextRange = rangeFromDays(def.days);
+      setRange(nextRange);
+      await fetchSummary(nextRange);
+    } finally {
+      setLoading(false);
     }
-
-    setRange(nextRange);
-    await fetchSummary(nextRange); // 期間を変更してデータを再取得
-  } finally {
-    setLoading(false);
   }
-}
 
-// meta APIを呼び終わって、1件データがあったらsummaryを取得 
-useEffect(() => {
-  fetchMeta().finally(() => {
-    fetchSummary(range).catch((e) => setError(e.message || "error"));
-  });
-}, []);
+  // token がある時だけ初期ロード
+  useEffect(() => {
+    if (!token) return;
 
-  // minDate が取得できたら、全期間押した時に効く（初回は押すまで不要）
+    fetchMeta().finally(() => {
+      fetchSummary(range).catch((e) => setError(e?.message || "error"));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   const rangeLabel = useMemo(() => {
     const def = RANGES.find((r) => r.key === rangeKey);
     return def?.label ?? "";
   }, [rangeKey]);
 
-  // X軸のラベルの数を設定
   const xInterval = (() => {
     const n = byDay.length;
-
-    // 少なければ全部表示
     if (n <= 6) return 0;
-
-    // 目盛りを最大12個くらいにしたい
     const step = Math.ceil(n / 6);
-
-    // rechartsの interval は「何個飛ばすか」なので step-1
     return step - 1;
   })();
-  
-  
 
+  // ---- ログイン画面 ----
+  if (!token) {
+    return (
+      <div className="wrap">
+        <h1>貯金箱トラッカー</h1>
+
+        <div className="card">
+          <h2>ログイン</h2>
+
+          {error && <div className="error">⚠ {error}</div>}
+
+          <input
+            className="input"
+            placeholder="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={loading}
+          />
+          <br />
+          <br />
+          <input
+            className="input"
+            type="password"
+            placeholder="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={loading}
+          />
+          <br />
+          <br />
+          <br />
+
+          <button className="btn" onClick={login} disabled={loading || !email || !password}>
+            ログイン
+          </button>
+          <br></br>
+          <p  className="muted">デモアカウント：id:admin@example.com  password:password123</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- アプリ本体 ----
   return (
-
     <div className="wrap">
       <h1>貯金箱トラッカー</h1>
 
@@ -277,7 +337,6 @@ useEffect(() => {
         </div>
 
         <div className="buttons">
-          {/* 金種リスト分のボタンを生成 */}
           {AMOUNTS.map((x) => (
             <button
               key={x.label}
@@ -333,8 +392,8 @@ useEffect(() => {
             </LineChart>
           </ResponsiveContainer>
         </div>
-
       </div>
+
       <div className="initRow">
         <button
           className="btn warn"
@@ -344,10 +403,9 @@ useEffect(() => {
           初期値を設定
         </button>
 
-        {initDone && (
-          <span className="muted">※ 初期値は設定済みです</span>
-        )}
+        {initDone && <span className="muted">※ 初期値は設定済みです</span>}
       </div>
+
       {showInitModal && (
         <div className="modalOverlay">
           <div className="modal">
@@ -368,11 +426,7 @@ useEffect(() => {
             />
 
             <div className="modalActions">
-              <button
-                className="btn"
-                onClick={() => setShowInitModal(false)}
-                disabled={loading}
-              >
+              <button className="btn" onClick={() => setShowInitModal(false)} disabled={loading}>
                 キャンセル
               </button>
 
@@ -391,7 +445,15 @@ useEffect(() => {
           </div>
         </div>
       )}
-    </div>
 
+      <button
+        className="btn"
+        onClick={() => {
+          handleUnauthorized(); // token消してログインへ
+        }}
+      >
+        ログアウト
+      </button>
+    </div>
   );
 }
