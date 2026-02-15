@@ -152,7 +152,7 @@ export default function App() {
   // summary
   async function fetchSummary(nextRange = range) {
     setError("");
-
+    console.log("summary");
     const qs = new URLSearchParams({
       from: nextRange.from,
       to: nextRange.to,
