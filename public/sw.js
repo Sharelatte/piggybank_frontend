@@ -1,7 +1,7 @@
 // サービスワーカー(PWAアプリとして動かすためのコード)
 
 // TODO: 更新のたびにバージョンを上げること（古いキャッシュを捨てる)
-const CACHE_NAME = "piggybank-v2";
+const CACHE_NAME = "piggybank-v3";
 
 // キャッシュするファイル
 const STATIC_ASSETS = [
@@ -12,22 +12,20 @@ const STATIC_ASSETS = [
   "/icon-512.png"
 ];
 
-// インストール
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  );
+  self.skipWaiting();
 });
 
-// 有効化
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
-        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
+        keys.filter((key) => key !== CACHE_NAME)
+            .map((key) => caches.delete(key))
       )
     )
   );
+  self.clients.claim();
 });
 
 // fetch
