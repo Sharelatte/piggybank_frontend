@@ -1,5 +1,7 @@
 // サービスワーカー(PWAアプリとして動かすためのコード)
-const CACHE_NAME = "piggybank-v1";
+
+// TODO: 更新のたびにバージョンを上げること（古いキャッシュを捨てる)
+const CACHE_NAME = "piggybank-v2";
 
 // キャッシュするファイル
 const STATIC_ASSETS = [
