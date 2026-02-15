@@ -2,7 +2,7 @@
 
 // TODO: 更新のたびにバージョンを上げること（古いキャッシュを捨てる)
 
-const CACHE_NAME = "piggybank-v4";
+const CACHE_NAME = "piggybank-v5";
 
 const STATIC_ASSETS = [
   "/",
