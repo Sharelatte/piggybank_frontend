@@ -30,16 +30,25 @@ self.addEventListener("activate", (event) => {
 
 // fetch
 self.addEventListener("fetch", (event) => {
+
+  const req = event.request;
   const url = new URL(event.request.url);
 
   // APIは Service Worker で触らない
   if (url.origin === self.location.origin && url.pathname.startsWith("/api/")) {
     return;
   }
-
+  
+  // ★HTML(ナビゲーション)はネット優先
+  if (req.mode === "navigate") {
+    event.respondWith(fetch(req).catch(() => caches.match("/index.html")));
+    return;
+  }
+  
+  // それ以外はキャッシュ優先
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request);
+      return cached || fetch(req);
     })
   );
 });
