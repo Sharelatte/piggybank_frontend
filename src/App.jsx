@@ -17,9 +17,9 @@ import { apiUrl, apiFetch, setToken as saveToken, clearToken } from "./api";
 // 貯金の種別
 const AMOUNTS = [
   { label: "+500円", amount: 500 },
-  { label: "-500円", amount: -500 },
-  { label: "+1円", amount: 1 },
-  { label: "-1円", amount: -1 },
+  // { label: "-500円", amount: -500 },
+  // { label: "+1円", amount: 1 },
+  // { label: "-1円", amount: -1 },
 ];
 
 // 期間の種別
@@ -92,6 +92,8 @@ export default function App() {
   const [granularity, setGranularity] = useState("day"); // day|week|month
 
   const [initAmount, setInitAmount] = useState("");
+  const [freeAmount, setFreeAmount] = useState("");
+
   const [showInitModal, setShowInitModal] = useState(false);
   const [initDone, setInitDone] = useState(false);
 
@@ -205,6 +207,29 @@ export default function App() {
     }
   }
 
+  // 金額自由入力
+  async function sendFreeAmount(freeAmount, sign) {
+    setLoading(true);
+    setError("");
+
+    try {
+      let amount = Number(freeAmount);
+      if (!Number.isInteger(amount) || amount <= 0) {
+        throw new Error("おつりは0以上の整数にしてください");
+      }
+      if((sign === "minus")) { amount = -amount;}
+
+      await postTransaction(amount);
+
+      setFreeAmount("");
+       
+    } catch (e) {
+      setError(e?.message || "error");
+    } finally {
+      setLoading(false);
+    }
+
+  }
   // initial balance
   async function postInitialBalance() {
     setLoading(true);
@@ -349,6 +374,31 @@ export default function App() {
               {x.label}
             </button>
           ))}
+            <input
+              className="inputFreeAmount"
+              inputMode="numeric"
+              placeholder="例: 485"
+              value={freeAmount}
+              onChange={(e) => setFreeAmount(e.target.value)}
+              disabled={loading}
+            />
+            <p className="YenText">円</p>
+            
+            <button
+              onClick={() => sendFreeAmount(freeAmount,"plus")}
+              disabled={loading}
+              className="btn"
+            >
+             足す
+            </button>
+            <button
+              onClick={() => sendFreeAmount(freeAmount,"minus")}
+              disabled={loading}
+              className="btn"
+            >
+             引く
+            </button>
+
         </div>
 
         <div className="rangeRow">

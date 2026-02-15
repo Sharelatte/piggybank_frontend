@@ -114,3 +114,15 @@
   border: 1px solid #ddd;
   min-width: 220px;
 }
+.inputFreeAmount {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  width: 60px;
+}
+
+.YenText {
+  height: 100%;
+  line-height: 100%;
+  vertical-align:middle;
+}
